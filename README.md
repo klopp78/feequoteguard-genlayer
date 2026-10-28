@@ -33,4 +33,7 @@ list_receipt_ids() -> str
 node scripts/check-contract.mjs
 ```
 
-The submitted Studio deployment is recorded after deployment.
+## Studio deployment
+
+- Contract: [`0x9f797016b31727AEac2548B1d1daB9F6eA32a9b5`](https://explorer-studio.genlayer.com/address/0x9f797016b31727AEac2548B1d1daB9F6eA32a9b5)
+- The deployed Studio source matches `contracts/fee_quote_guard.py`.
