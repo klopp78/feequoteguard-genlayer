@@ -36,5 +36,5 @@ node scripts/check-contract.mjs
 
 ## Studio deployment
 
-- Contract: [`0x9f797016b31727AEac2548B1d1daB9F6eA32a9b5`](https://explorer-studio.genlayer.com/address/0x9f797016b31727AEac2548B1d1daB9F6eA32a9b5)
+- Contract: [`0x45E2816270C7368f98654a7d7f8121aB9b0050Fb`](https://explorer-studio.genlayer.com/address/0x45E2816270C7368f98654a7d7f8121aB9b0050Fb)
 - The deployed Studio source matches `contracts/fee_quote_guard.py`.
