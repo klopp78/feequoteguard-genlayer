@@ -5,6 +5,7 @@ from genlayer import *
 import hashlib
 import json
 import typing
+from urllib.parse import urlsplit
 
 
 class FeeQuoteGuard(gl.Contract):
@@ -55,8 +56,9 @@ class FeeQuoteGuard(gl.Contract):
         if expiry > _now() + 7 * 24 * 60 * 60:
             raise Exception("expiry_must_be_within_seven_days")
 
-        urls = _urls([url for url in quote_urls])
-        manifest = _manifest(urls)
+        sources = _urls([url for url in quote_urls])
+        urls = [item["url"] for item in sources]
+        manifest = _manifest(sources)
         if len({item["source_identity"] for item in manifest}) < 2:
             raise Exception("two_independent_registrable_domains_required")
 
@@ -223,22 +225,46 @@ def _parse_result(raw: str) -> dict:
     return item
 
 
-def _urls(raw_urls: typing.Sequence[str]) -> typing.Sequence[str]:
+def _urls(raw_urls: typing.Sequence[str]) -> typing.Sequence[dict]:
     if len(raw_urls) < 2 or len(raw_urls) > 4:
         raise Exception("use_two_to_four_quote_sources")
-    urls, seen = [], set()
+    sources, seen = [], set()
     for raw in raw_urls:
-        url = str(raw).strip()
-        key = url.rstrip("/").lower()
-        if not url.startswith("https://") or len(url) > 600 or key in seen:
+        source = _parse_quote_url(str(raw))
+        key = source["url"]
+        if key in seen:
             raise Exception("invalid_or_duplicate_quote_url")
         seen.add(key)
-        urls.append(url)
-    return urls
+        sources.append(source)
+    return sources
 
 
-def _manifest(urls: typing.Sequence[str]) -> typing.Sequence[dict]:
-    return [{"source_index":index + 1,"url":url,"host":_host(url),"source_identity":_registrable_domain(_host(url)),"url_hash":_sha256(url)} for index, url in enumerate(urls)]
+def _parse_quote_url(raw: str) -> dict:
+    url = raw.strip()
+    if not url or url != raw or len(url) > 600 or any(char.isspace() for char in url):
+        raise Exception("invalid_quote_url")
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        raise Exception("invalid_quote_url_authority")
+    if parsed.scheme.lower() != "https" or not parsed.netloc or parsed.username is not None or parsed.password is not None:
+        raise Exception("invalid_quote_url_authority")
+    # Do not permit user-info, encoded authority tricks, backslashes, or a non-default port.
+    if any(char in parsed.netloc for char in ("@", "\\", "%")) or port not in (None, 443):
+        raise Exception("invalid_quote_url_authority")
+    host = (parsed.hostname or "").rstrip(".").lower()
+    if not _valid_hostname(host):
+        raise Exception("invalid_source_host")
+    path = parsed.path or "/"
+    canonical_url = "https://" + host + path
+    if parsed.query:
+        canonical_url += "?" + parsed.query
+    return {"url": canonical_url, "host": host, "source_identity": _registrable_domain(host)}
+
+
+def _manifest(sources: typing.Sequence[dict]) -> typing.Sequence[dict]:
+    return [{"source_index":index + 1,"url":source["url"],"host":source["host"],"source_identity":source["source_identity"],"url_hash":_sha256(source["url"])} for index, source in enumerate(sources)]
 
 
 def _canonical_action(action: str, currency: str, max_fee: int, expires_at: int) -> dict:
@@ -265,11 +291,16 @@ def _text(raw: str, field: str, minimum: int, maximum: int) -> str:
     return value
 
 
-def _host(url: str) -> str:
-    host = url.split("//", 1)[1].split("/", 1)[0].split(":", 1)[0].lower()
-    if "." not in host or len(host) > 253:
-        raise Exception("invalid_source_host")
-    return host
+def _valid_hostname(host: str) -> bool:
+    if "." not in host or len(host) > 253 or host.replace(".", "").isdigit():
+        return False
+    labels = host.split(".")
+    for label in labels:
+        if not label or len(label) > 63 or label[0] == "-" or label[-1] == "-":
+            return False
+        if any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in label):
+            return False
+    return True
 
 
 def _registrable_domain(host: str) -> str:

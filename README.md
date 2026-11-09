@@ -22,7 +22,8 @@ list_receipt_ids() -> str
 ## Safety properties
 
 - Canonical SHA-256 commitments bind the reviewed action and source manifest.
-- Two independent registrable domains are mandatory; `www` and sibling subdomains cannot count twice.
+- Quote URLs are parsed with a standards-compliant HTTPS parser. User info, ambiguous authorities, encoded authorities, non-default ports, IP-style hosts and malformed DNS hosts are rejected before a source identity is calculated from the parsed hostname.
+- Two independent registrable domains are mandatory; `www` and sibling subdomains cannot count twice, and different user-info prefixes cannot manufacture independent sources for one destination host.
 - Every validator recomputes rendered-source snapshot hashes and consequential decision fields.
 - Fees must be positive, within the cap, and consumed before expiry.
 - Receipts are requester-bound and replay protected.
